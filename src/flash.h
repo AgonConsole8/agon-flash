@@ -10,9 +10,12 @@
 #define FLASHSTART	0x0
 #define BLOCKSIZE   16384
 
+#include <stdint.h>
+
 extern void enableFlashKeyRegister(void);
 extern void lockFlashKeyRegister(void);
-extern void fastmemcpy(UINT24 destination, UINT24 source, UINT24 size);
+extern void fastmemcpy(uint24_t destination, uint24_t source, uint24_t size);
 extern void reset(void);
-extern void startVDPupdate(UINT8 filehandle, UINT24 filesize);
-#endif FLASH_H
+extern void startVDPupdate(uint8_t filehandle, uint24_t filesize);
+
+#endif //FLASH_H

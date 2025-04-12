@@ -8,11 +8,9 @@
  * 06/11/2022:		Initial version
  */
 
-#include <defines.h>
-
 #ifndef AGONTIMER_H
 #define AGONTIMER_H
 
 void delayms(int ms);
 
-#endif AGONTIMER_H
+#endif //AGONTIMER_H

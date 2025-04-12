@@ -7,17 +7,16 @@
 ; Modinfo:
 ;	14/10/2023: VDP update routine added
 
-	XDEF _enableFlashKeyRegister
-	XDEF _fastmemcpy
-	XDEF _reset
-	XDEF _startVDPupdate
-	
-	segment CODE
-	.assume ADL=1
-	.include "mos_api.inc"
+	.global _enableFlashKeyRegister
+	.global _fastmemcpy
+	.global _reset
+	.global _startVDPupdate
+
+    .assume adl = 1	
+    .text
 
 BUFFERSIZE	EQU 1024
-buffer		EQU 50000h	; memory location
+buffer		EQU $50000	; memory location
 
 _enableFlashKeyRegister:
 	PUSH	IX
@@ -25,17 +24,17 @@ _enableFlashKeyRegister:
 	ADD		IX, SP
 	
 	; actual work here
-	LD		A, b6h	; unlock
-	OUT0	(F5h), A
-	LD		A, 49h
-	OUT0	(F5h), A
+	LD		A, $b6	; unlock
+	OUT0	($F5), A
+	LD		A, $49
+	OUT0	($F5), A
 	
 	LD		SP, IX
 	POP		IX
 	RET
 	
 _reset:
-	RST	0h
+	RST	0
 	RET ; will never get here
 	
 _fastmemcpy:
@@ -72,25 +71,25 @@ _startVDPupdate:
 
 sendstartsequence:
     LD  A, 23
-    RST.LIL 10h
+    RST.LIL $10
     LD  A, 0
-    RST.LIL 10h
-    LD  A, A1h
-    RST.LIL 10h
+    RST.LIL $10
+    LD  A, $A1
+    RST.LIL $10
     LD  A, 1
-    RST.LIL 10h
+    RST.LIL $10
 
 sendsize:
 	LD	HL, (filesize)
     LD   A, L
-    RST.LIL 10h ; send LSB
+    RST.LIL $10 ; send LSB
     LD   A, H
-    RST.LIL 10h ; send middle byte
+    RST.LIL $10 ; send middle byte
     PUSH HL
     INC  SP
     POP  AF
     DEC  SP
-    RST.LIL 10h ; send MSB
+    RST.LIL $10 ; send MSB
 
 senddata_start:
     LD   A, 0
@@ -101,8 +100,8 @@ senddata:
     LD   C, A
     LD   HL, buffer
     LD   DE, BUFFERSIZE
-    LD   A, mos_fread
-    RST.LIL 08h
+    LD   A, $1A ; mos_fread
+    RST.LIL $08
     LD   A, D
     OR   E        ; 0 bytes read?
     JR   Z, sendchecksum
@@ -112,11 +111,11 @@ senddata:
     POP  BC          ; length of the bufferstream to bc
     LD   A, 0        ; don't care as bc is set
     PUSH DE
-    RST.LIL 18h
+    RST.LIL $18
     POP  DE
 ; calculate checksum
     LD   HL, buffer
-$$:
+1:
     LD   A, (checksum)
     ADD  A, (HL)
     LD   (checksum), A
@@ -124,23 +123,24 @@ $$:
     INC  HL
     LD   A, D ; check if de == 0
     OR   E
-    JR   NZ, $B ; more bytes to send
+    JR   NZ, 1b ; more bytes to send
 
     JR   senddata ; next buffer read from disk
 
 sendchecksum:
     LD   A, (checksum)
     NEG ; calculate two's complement
-    RST.LIL 10h
+    RST.LIL $10
 
 	LD		SP, IX
 	POP		IX
 	RET
 
+    .data
 checksum:
-	DS	1
+    .db 0
 filehandle:
-	DS	1
+    .db 0
 filesize:
-	DS	3
+    .d24 0
 end

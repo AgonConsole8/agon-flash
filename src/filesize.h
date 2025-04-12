@@ -1,6 +1,7 @@
 #ifndef FILESIZE_H
 #define FILESIZE_H
 
-UINT24 getFileSize(const char filehandle);
+#include <stdint.h>
+extern uint24_t getFileSize(uint8_t filehandle);
 
-#endif FILESIZE_H
+#endif //FILESIZE_H
