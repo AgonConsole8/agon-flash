@@ -29,36 +29,21 @@ _crc32_initialize:
     LD      (crc32result), A
     EXX
 
-    ; start replacement for LD HL, crc32_lookup_table >> 2
-    ; which doesn't work in gnu-as with linked code segments, where the address is unknown at assembly
+    ; replacement for LD HL, crc32_lookup_table >> 2
+    ; which doesn't work in gnu-as with linked code segments, where the symbol address is unknown at assembly
     PUSH    HL
-    PUSH    AF
-    LD      HL, crc32_lookup_table ; load address of the crc32_lookup_table
-    ; shift first bit
-    LD      (shiftedtable), HL            ; save the address, so it's individual bytes are editable
-    LD      A, (shiftedtable+2)           ; load MSB from the address
-    SRL     A                     ; shift right
-    LD      (shiftedtable+2),A            ; store MSB
-    LD      A, (shiftedtable+1)
-    RR      A
-    LD      (shiftedtable+1), A
-    LD      A, (shiftedtable)             ; load LSB from the address
-    RR      A
-    LD      (shiftedtable), A             ; store LSB
-    ; shift second bit
-    LD      A, (shiftedtable+2)           ; load MSB from the address
-    SRL     A                     ; shift right
-    LD      (shiftedtable+2),A            ; store MSB
-    LD      A, (shiftedtable+1)
-    RR      A
-    LD      (shiftedtable+1), A
-    LD      A, (shiftedtable)             ; load LSB from the address
-    RR      A
-    LD      (shiftedtable), A             ; store LSB
-
-    ; crc32_lookup_table >> 2 is now in (shiftedtable) 
+    LD      HL, crc32_lookup_table      ; load address of the crc32_lookup_table
+    LD      (shiftedtable), HL          ; save the address, so we can reach the upper byte individually
+    LD      A, (shiftedtable+2)         ; get HLU
+    SRL     A                           ; start shifting 1st bit
+    RR      H
+    RR      L
+    SRL     A                           ; start shifting 2nd bit
+    RR      H
+    RR      L
+    LD      (shiftedtable), HL
+    LD      (shiftedtable+2), A         ; crc32_lookup_table >> 2 is now stored in (shiftedtable) 
     POP     HL
-    POP     AF 
     RET
 
 _crc32_finalize:
