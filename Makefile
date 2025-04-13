@@ -1,4 +1,6 @@
-# Program name
+# Assumes installed agondev development environment
+# See https://github.com/envenomator/agondev for details
+#
 NAME=flash
 
 # verbosity - comment to show all output
