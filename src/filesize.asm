@@ -1,18 +1,11 @@
-	XDEF _getFileSize
-	
-    .global _getfileSize
-    .assume adl = 1	
-    .text
-
 ; Gets filesize from an open file
 ; requires MOS mos_getfil call
 ; Input: A - MOS filehandle
 ; Output: HL - 24bit filesize
 
-; Gets filesize from an open file
-; requires MOS mos_getfil call
-; Input: MOS filehandle
-; Output: HL - 24bit filesize
+    .global _getFileSize
+    .assume adl = 1	
+    .text
 
 _getFileSize:
 	PUSH IX

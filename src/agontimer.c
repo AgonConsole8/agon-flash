@@ -2,10 +2,11 @@
  * Title:			AGON timer interface
  * Author:			Jeroen Venema
  * Created:			06/11/2022
- * Last Updated:	06/11/2022
+ * Last Updated:	12/04/2025
  * 
  * Modinfo:
  * 06/11/2022:		Initial version
+ * 12/04/2025:      Updated for agondev
  */
 
 #include "ez80f92.h"

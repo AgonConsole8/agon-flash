@@ -2,10 +2,11 @@
 ; Title:		Flash interface
 ; Author:		Jeroen Venema
 ; Created:		16/12/2022
-; Last Updated:	14/10/2023
+; Last Updated:	12/04/2025
 ; 
 ; Modinfo:
 ;	14/10/2023: VDP update routine added
+;   12/04/2025: Updated for agondev
 
 	.global _enableFlashKeyRegister
 	.global _fastmemcpy
@@ -38,31 +39,31 @@ _reset:
 	RET ; will never get here
 	
 _fastmemcpy:
-	PUSH	IX
-	LD		IX, 0
-	ADD		IX, SP
+	PUSH    IX
+	LD      IX, 0
+	ADD     IX, SP
 
-	PUSH BC
-	PUSH DE
-	PUSH HL
+	PUSH    BC
+	PUSH    DE
+	PUSH    HL
 	
 	LD		DE, (IX+6)	; destination address
 	LD		HL, (IX+9)	; source
 	LD		BC, (IX+12)	; number of bytes to write to flash
 	LDIR
 
-	POP HL
-	POP DE
-	POP BC
+	POP     HL
+	POP     DE
+	POP     BC
 
-	LD		SP, IX
-	POP		IX
+	LD      SP, IX
+	POP     IX
 	RET
 
 _startVDPupdate:
-	PUSH	IX
-	LD		IX, 0
-	ADD		IX, SP
+	PUSH    IX
+	LD      IX, 0
+	ADD     IX, SP
 
 	LD	A, (IX+6)
 	LD	(filehandle), A

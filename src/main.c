@@ -2,7 +2,7 @@
  * Title:			Agon firmware upgrade utility
  * Author:			Jeroen Venema
  * Created:			17/12/2022
- * Last Updated:	02/11/2023
+ * Last Updated:	13/04/2025
  * 
  * Modinfo:
  * 17/12/2022:		Initial version
@@ -11,6 +11,7 @@
  * 07/06/2023:		Included faster crc32, by Leigh Brown
  * 14/10/2023:		VDP update code, MOS update rewritten for simplicity
  * 02/11/2023:		Batched mode, rewrite of UI
+ * 13/04/2025:      Ported to agondev
  */
 
 #include "ez80f92.h"
@@ -25,9 +26,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
-#include <stdarg.h>
-//#include "filesize.h"
-extern uint24_t getFileSize(const char filehandle);
+#include "filesize.h"
 
 #define UNLOCKMATCHLENGTH 9
 #define EXIT_FILENOTFOUND	4
@@ -187,9 +186,8 @@ bool update_vdp(void) {
 
 bool update_mos(char *filename) {
 	uint32_t crcresult;
-	uint24_t got;
+	uint24_t bytesread;
 	char* ptr = (char*)BUFFER1;
-	//volatile uint8_t value;
 	uint24_t counter, pagemax, lastpagebytes;
 	uint24_t addressto,addressfrom;
 	uint24_t filesize;
@@ -204,9 +202,9 @@ bool update_mos(char *filename) {
 	filesize = getFileSize(mosfilehandle->fhandle);
 	// Read file to memory
 	crc32_initialize();
-	while((got = fread(ptr, 1, BLOCKSIZE, mosfilehandle)) > 0) {
-		crc32(ptr, got);
-		ptr += got;
+	while((bytesread = fread(ptr, 1, BLOCKSIZE, mosfilehandle)) > 0) {
+		crc32(ptr, bytesread);
+		ptr += bytesread;
 		putch('.');
 	}
 	crcresult = crc32_finalize();
@@ -241,10 +239,8 @@ bool update_mos(char *filename) {
 		{
 			IO(FLASH_PAGE) = counter;
 			IO(FLASH_PGCTL) = 0x02;			// Page erase bit enable, start erase
-            
-            while(IO(FLASH_PGCTL) & 0x02); // wait for completion of erase
+            while(IO(FLASH_PGCTL) & 0x02);  // wait for completion of erase
 		}
-
         outstring("\r\n");
 				
 		// determine number of pages to write
@@ -370,9 +366,12 @@ bool parseCommands(int argc, char *argv[]) {
 	return (flashvdp || flashmos);
 }
 
-bool filesExist(void) {
+bool openFiles(void) {
 	bool filesexist = true;
 
+    mosfilehandle = NULL;
+    vdpfilehandle = NULL;
+    
 	if(flashmos) {
 		mosfilehandle = fopen(mosfilename, "rb");
 		if(!mosfilehandle) {
@@ -388,6 +387,7 @@ bool filesExist(void) {
 			sprintf(message,"Error opening VDP firmware \"%s\"\n\r",vdpfilename);
             outstring(message);
 			filesexist = false;
+            if(mosfilehandle) fclose(mosfilehandle);
 		}
 	}
 	return filesexist;
@@ -429,13 +429,13 @@ bool validFirmwareFiles(void) {
 }
 
 void showCRC32(void) {
-	if(flashmos) {sprintf(message,"MOS CRC 0x%04lX\r\n", moscrc); outstring(message);}
-	if(flashvdp) {sprintf(message,"VDP CRC 0x%04lX\r\n", vdpcrc); outstring(message);}
+	if(flashmos) {sprintf(message,"MOS CRC 0x%08lX\r\n", moscrc); outstring(message);}
+	if(flashvdp) {sprintf(message,"VDP CRC 0x%08lX\r\n", vdpcrc); outstring(message);}
 	outstring("\r\n");
 }
 
 void calculateCRC32(void) {
-	uint24_t got,size;
+	uint24_t bytesread;
 	char* ptr;
 
 	moscrc = 0;
@@ -449,9 +449,9 @@ void calculateCRC32(void) {
 		crc32_initialize();
 		
 		// Read file to memory
-		while((got = fread(ptr, 1, BLOCKSIZE, mosfilehandle)) > 0) {
-			crc32(ptr, got);
-			ptr += got;
+		while((bytesread = fread(ptr, 1, BLOCKSIZE, mosfilehandle)) > 0) {
+			crc32(ptr, bytesread);
+			ptr += bytesread;
 			putch('.');
 		}		
 		moscrc = crc32_finalize();
@@ -460,12 +460,10 @@ void calculateCRC32(void) {
 	if(flashvdp) {
         fseek(vdpfilehandle, 0, SEEK_SET);
 		crc32_initialize();
-		while(1) {
-			size = fread((char *)BUFFER1, 1, BLOCKSIZE, vdpfilehandle);
-			if(size == 0) break;
-			putch('.');
-			crc32((char *)BUFFER1, size);
-		}
+        while((bytesread = fread((char *)BUFFER1, 1, BLOCKSIZE, vdpfilehandle)) > 0) {
+            crc32((char *)BUFFER1, bytesread);
+            putch('.');
+        }
 		vdpcrc = crc32_finalize();
         fseek(vdpfilehandle, 0, SEEK_SET);
 	}
@@ -486,7 +484,7 @@ int main(int argc, char * argv[]) {
 		return EXIT_INVALIDPARAMETER;
 	}
 
-	if(!filesExist()) return EXIT_FILENOTFOUND;
+	if(!openFiles()) return EXIT_FILENOTFOUND;
 	if(!validFirmwareFiles()) {
 		return EXIT_INVALIDPARAMETER;
 	}
