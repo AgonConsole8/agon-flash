@@ -26,7 +26,6 @@
 #include <errno.h>
 #include <ctype.h>
 #include <mos_api.h>
-#include "getsysvars.h"
 #include "flash.h"
 #include "agontimer.h"
 #include "crc32.h"
@@ -487,7 +486,7 @@ void calculateCRC32(void) {
 }
 
 int main(int argc, char * argv[]) {	
-    SYSVAR *sysvars = getsysvars();
+    SYSVAR *sysvars = (SYSVAR *)mos_sysvars();
 	uint16_t tmp;
 
     // DEBUG PortC pin option
