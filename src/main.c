@@ -12,7 +12,14 @@
  * 14/10/2023:		VDP update code, MOS update rewritten for simplicity
  * 02/11/2023:		Batched mode, rewrite of UI
  * 13/04/2025:      Ported to agondev
+ * 22/04/2025:      echoVDP now asks for screen dimensions specifically
+ *                  Added DEBUG options to debug updating VDP
  */
+
+// DEBUG if set to 1:
+// - PortC bit position 0 upon entry to vdp_update
+// - PortC bit position 1 will flash during echoVDP, to show activity while the VDP isn't responding
+#define DEBUG 0
 
 #include "ez80f92.h"
 #include <stdio.h>
@@ -42,7 +49,6 @@
 #define CMDBATCH	5
 
 int errno; // needed by standard library
-enum states{firmware,retry,systemreset};
 
 bool		flashmos = false;
 char		mosfilename[256];
@@ -134,18 +140,13 @@ bool containsESP32Header(uint8_t *filestart) {
 }
 
 void print_version(void) {
-	outstring("Agon firmware update utility v1.8\n\r\n\r");
+	outstring("Agon firmware update utility v1.9\n\r\n\r");
 }
 
 void usage(void) {
 	print_version();
 	outstring("Usage: FLASH [all | [mos <filename>] [vdp <filename>] | batch] <-f>\n\r");
 }
-
-typedef enum {
-	MOS,
-	VDP
-} flashtype;
 
 bool getResponse(void) {
 	uint8_t response = 0;
@@ -181,7 +182,7 @@ bool update_vdp(void) {
 	outstring("Updating VDP firmware\r\n");
 	filesize = getFileSize(vdpfilehandle->fhandle);	
 	startVDPupdate(vdpfilehandle->fhandle, filesize);
-	return true;
+    return true;
 }
 
 bool update_mos(char *filename) {
@@ -235,8 +236,7 @@ bool update_mos(char *filename) {
 		enableFlashKeyRegister();	// will need to unlock again after previous write to the flash protection register
 		IO(FLASH_FDIV) = 0x5F;			// Ceiling(18Mhz * 5,1us) = 95, or 0x5F
 	
-		for(counter = 0; counter < FLASHPAGES; counter++)
-		{
+		for(counter = 0; counter < FLASHPAGES; counter++) {
 			IO(FLASH_PAGE) = counter;
 			IO(FLASH_PGCTL) = 0x02;			// Page erase bit enable, start erase
             while(IO(FLASH_PGCTL) & 0x02);  // wait for completion of erase
@@ -245,16 +245,14 @@ bool update_mos(char *filename) {
 				
 		// determine number of pages to write
 		pagemax = filesize/PAGESIZE;
-		if(filesize%PAGESIZE) // last page has less than PAGESIZE bytes
-		{
+		if(filesize%PAGESIZE) {// last page has less than PAGESIZE bytes 
 			pagemax += 1;
 			lastpagebytes = filesize%PAGESIZE;			
 		}
 		else lastpagebytes = PAGESIZE; // normal last page
 		
 		// write out each page to flash
-		for(counter = 0; counter < pagemax; counter++)
-		{
+		for(counter = 0; counter < pagemax; counter++) {
 			sprintf(message,"\rWriting flash page %03d/%03d", counter+1, pagemax);
             outstring(message);
 
@@ -289,11 +287,30 @@ bool update_mos(char *filename) {
 }
 
 void echoVDP(uint8_t value) {
+    // Disable flowcontrol
+    putch(23);
+    putch(0);
+    putch(0xF9);
+    putch(0x01);
+    putch(0x01);
+    // Request general Poll
 	putch(23);
 	putch(0);
 	putch(0x80);
 	putch(value);
-	delayms(100);
+
+    #if defined(DEBUG) && (DEBUG == 1)
+        IO(PC_DR) = IO(PC_DR) | 0x02; // set bit position 1
+        delayms(150);
+        IO(PC_DR) = IO(PC_DR) & (0x01); // everything off, except bit 0
+    #endif
+
+    // Get screen dimensions
+    putch(23);
+    putch(0);
+    putch(0x86);
+    // Wait a while before sending the next echo
+    delayms(150);
 }
 
 int getCommand(const char *command) {
@@ -380,7 +397,6 @@ bool openFiles(void) {
 			filesexist = false;
 		}
 	}
-
 	if(flashvdp) {
 		vdpfilehandle = fopen(vdpfilename, "rb");
 		if(!vdpfilehandle) {
@@ -474,6 +490,12 @@ int main(int argc, char * argv[]) {
     SYSVAR *sysvars = getsysvars();
 	uint16_t tmp;
 
+    // DEBUG PortC pin option
+    #if defined(DEBUG) && (DEBUG == 1) // Set all PortC pins to output && to 0
+        IO(PC_DDR) = 0;
+        IO(PC_DR) = 0;
+    #endif
+
 	// All checks
 	if(argc == 1) {
 		usage();
@@ -505,6 +527,11 @@ int main(int argc, char * argv[]) {
 		while(sysvars->scrHeight == 0); // wait for 1st feedback from VDP
 		tmp = sysvars->scrHeight;
 		sysvars->scrHeight = 0;
+        
+        #if defined(DEBUG) && (DEBUG == 1) // Start update indicator, set PortC bit 0 to 1
+            IO(PC_DR) = 1;
+        #endif
+
 		if(update_vdp()) {
 			while(sysvars->scrHeight == 0) {
                 echoVDP(1);
@@ -518,6 +545,10 @@ int main(int argc, char * argv[]) {
 			}
 		}
 	    fclose(vdpfilehandle);
+
+        #if defined(DEBUG) && (DEBUG == 1) // Stop update indicator (VDP is responsive), set PortC bit 0 to 0
+            IO(PC_DR) = 0;
+        #endif
 	}
 
 	if(flashmos) {

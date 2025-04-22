@@ -2,11 +2,12 @@
 ; Title:		Flash interface
 ; Author:		Jeroen Venema
 ; Created:		16/12/2022
-; Last Updated:	12/04/2025
+; Last Updated:	22/04/2025
 ; 
 ; Modinfo:
 ;	14/10/2023: VDP update routine added
 ;   12/04/2025: Updated for agondev
+;   22/04/2025: Saving BC/DE/HL registers required in _startVDPupdate
 
 	.global _enableFlashKeyRegister
 	.global _fastmemcpy
@@ -64,6 +65,10 @@ _startVDPupdate:
 	PUSH    IX
 	LD      IX, 0
 	ADD     IX, SP
+
+    PUSH    BC
+    PUSH    DE
+    PUSH    HL
 
 	LD	A, (IX+6)
 	LD	(filehandle), A
@@ -133,6 +138,11 @@ sendchecksum:
     NEG ; calculate two's complement
     RST.LIL $10
 
+    PUSH    HL
+    PUSH    DE
+    PUSH    BC
+
+    LD      A, 0
 	LD		SP, IX
 	POP		IX
 	RET
